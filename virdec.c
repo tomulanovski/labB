@@ -8,6 +8,13 @@ char virusName[16];
 unsigned char* sig;
 } virus;
 
+typedef struct link link;
+
+struct link {
+link *nextVirus;
+virus *vir;
+};
+
 int isLittle = 1;
 
 virus* readVirus(FILE* sigFile){
@@ -59,13 +66,44 @@ void printVirus(virus* virus, FILE* output){
     fprintf(output, "\n\n");
 }
 
+void list_print(link *virus_list, FILE* outputFile) {
+    link *copyList = virus_list;
+    while(copyList!=NULL) {
+        printVirus(copyList->vir, outputFile);
+        copyList = copyList ->nextVirus;
+    }
+}
+link* list_append(link* virus_list, virus* data) {
+    link* newVirus = (link*)malloc(sizeof(link));
+     if (newVirus == NULL) {
+        perror("error in allocating memory for new virus");
+        exit(1);
+    }
+    newVirus ->vir = data; 
+    newVirus->nextVirus = virus_list;
+    return newVirus;
+}
 
-int main(int argc, char* argv[]) {
+void list_free(link *virus_list) {
+    while (virus_list !=NULL) {
+        free(virus_list->vir->sig);
+        free(virus_list->vir);
+        link *tmp = virus_list->nextVirus;
+        free(virus_list);
+        virus_list = tmp;   
+    }
+}
 
-    FILE* sigFile = fopen("signatures-B","rb");
+link* loadSignatures(link *virus_list , FILE* outputFile) {
+    char* fileName=NULL;
+    char inBuf[BUFSIZ];
+    printf("Enter signatures file name:\n");
+    fgets(inBuf,sizeof(inBuf),stdin);
+    sscanf(inBuf,"%ms",&fileName);
+    FILE* sigFile = fopen(fileName,"rb");
     if (sigFile == NULL) {
-        perror("Error opening file");
-        return 1;
+        perror("no file");
+        exit(0);
     }
     char magicNumber[4];
     fread(magicNumber, sizeof(char), 4, sigFile);
@@ -75,17 +113,82 @@ int main(int argc, char* argv[]) {
     else if(strncmp(magicNumber, "VIRL", 4) != 0) {
         fprintf(stderr, "Wrong magic number. Exiting.\n");
         fclose(sigFile);
-        return 1;
+        exit(1);
     }
-    while (!feof(sigFile)) {
+     while (!feof(sigFile)) {
         virus* v = readVirus(sigFile);
-        printVirus(v, stdout);
-        free(v->sig);
-        free(v);
+        virus_list = list_append(virus_list,v);
     }
-
     fclose(sigFile);
+    // freeing the memory used by the %ms
+    free(fileName);
+    return virus_list;
+}
+
+link* printSignatures(link *virus_list , FILE* outputFile) {
+    list_print(virus_list,outputFile);
+    return virus_list;
+}
+
+struct fun_desc {
+    char *name;
+    link* (*fun)(link* ,FILE*);
+};
+link* detectViruses(link *virus_list , FILE* outputFile){
+    printf("not implemented yet\n");
+    return virus_list;
+}
+link* fixFile(link *virus_list , FILE* outputFile){
+    printf("not implemented yet\n");
+    return virus_list;
+}
+link* quit(link *virus_list , FILE* outputFile) {
+    list_free(virus_list);
+    printf("quitting\n");
+    return NULL;
+}
 
 
+int main(int argc, char* argv[]) {
+       struct fun_desc menu[] = {
+            {"Load signatures", loadSignatures},
+            {"Print signatures", printSignatures},
+            {"Detect viruses", detectViruses},
+            {"Fix file", fixFile},
+            {"quit", quit}, 
+            {NULL,NULL}      
+    };
+        char input[10];
+        int bound = sizeof(menu) / (sizeof(menu[0]))-1;
+        int opChosen;
+        link *virus_list = NULL;
+        while(1) {
+
+            printf("choose an option:\n");
+            for (int i = 0; menu[i].name != NULL; i++) {
+            printf("%d- %s\n", i+1, menu[i].name);
+        }
+         if (fgets(input, sizeof(input), stdin) == NULL) {
+            // Exit the loop on EOF
+            printf("Exiting\n");
+            exit(1);
+        }
+        sscanf(input,"%d",&opChosen);
+        opChosen--;
+        if(opChosen==4) {
+            quit(virus_list,stdout);
+            exit(0);
+
+        }
+        if (opChosen>=0 && opChosen<bound) {
+            printf (" within bounds\n");
+            virus_list = menu[opChosen].fun(virus_list,stdout);
+        }
+        else {
+            printf ("Not within bounds\nExiting\n");
+            exit(1);
+        }
+        }
 return 0;
 }
+
