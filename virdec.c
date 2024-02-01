@@ -50,7 +50,7 @@ virus* readVirus(FILE* sigFile){
     else
     {
         free(inputVirus);
-        exit(1);
+        return NULL;
     }
     
     return inputVirus;
@@ -94,7 +94,7 @@ void list_free(link *virus_list) {
     }
 }
 
-link* loadSignatures(link *virus_list , FILE* outputFile) {
+link* loadSignatures(link *virus_list , char* inputFile) {
     char* fileName=NULL;
     char inBuf[BUFSIZ];
     printf("Enter signatures file name:\n");
@@ -117,6 +117,7 @@ link* loadSignatures(link *virus_list , FILE* outputFile) {
     }
      while (!feof(sigFile)) {
         virus* v = readVirus(sigFile);
+        if(v!=NULL)
         virus_list = list_append(virus_list,v);
     }
     fclose(sigFile);
@@ -125,31 +126,70 @@ link* loadSignatures(link *virus_list , FILE* outputFile) {
     return virus_list;
 }
 
-link* printSignatures(link *virus_list , FILE* outputFile) {
-    list_print(virus_list,outputFile);
+link* printSignatures(link *virus_list , char* inputFile) {
+    list_print(virus_list,stdout);
+    return virus_list;
+}
+void detect_virus(char *buffer, unsigned int size, link *virus_list){
+    link *curVirus = virus_list;
+    while (curVirus!=NULL) {
+        virus* vir = curVirus ->vir;
+        int virusSize = vir->SigSize;
+        if (virusSize <= size) {
+        for (int position = 0; position<size;position++) {
+            
+            if (memcmp(buffer+position, vir->sig, virusSize) == 0) {
+                // Virus detected
+                printf("Virus detected!\n");
+                printf("Starting byte location: %d\n", position);
+                printf("Virus name: %s\n", vir->virusName);
+                printf("Size of the virus signature: %d\n", virusSize);
+                break;
+            }  
+        }
+        }
+        curVirus = curVirus ->nextVirus;
+    }
+}
+
+link* detectViruses(link *virus_list , char* inputFile){
+    char buf[10000*sizeof(char)];
+    FILE *suspectedFile = fopen(inputFile, "rb");
+    if (suspectedFile == NULL) {
+        perror("Error opening suspected file");
+        return virus_list;
+    }
+    unsigned int size = fread(buf, 1, sizeof(buf), suspectedFile);
+    detect_virus(buf, size, virus_list);
+    fclose(suspectedFile);
     return virus_list;
 }
 
-struct fun_desc {
-    char *name;
-    link* (*fun)(link* ,FILE*);
-};
-link* detectViruses(link *virus_list , FILE* outputFile){
+
+
+link* fixFile(link *virus_list , char* inputFile){
     printf("not implemented yet\n");
     return virus_list;
 }
-link* fixFile(link *virus_list , FILE* outputFile){
-    printf("not implemented yet\n");
-    return virus_list;
-}
-link* quit(link *virus_list , FILE* outputFile) {
+link* quit(link *virus_list , char* inputFile) {
     list_free(virus_list);
     printf("quitting\n");
     return NULL;
 }
+struct fun_desc {
+    char *name;
+    link* (*fun)(link* ,char*);
+};
 
 
 int main(int argc, char* argv[]) {
+
+    if(argc!=2) {
+        printf(" number of arguments is not 2");
+        exit(1);
+    }
+
+    
        struct fun_desc menu[] = {
             {"Load signatures", loadSignatures},
             {"Print signatures", printSignatures},
@@ -176,13 +216,13 @@ int main(int argc, char* argv[]) {
         sscanf(input,"%d",&opChosen);
         opChosen--;
         if(opChosen==4) {
-            quit(virus_list,stdout);
+            quit(virus_list,argv[1]);
             exit(0);
 
         }
         if (opChosen>=0 && opChosen<bound) {
             printf (" within bounds\n");
-            virus_list = menu[opChosen].fun(virus_list,stdout);
+            virus_list = menu[opChosen].fun(virus_list,argv[1]);
         }
         else {
             printf ("Not within bounds\nExiting\n");
