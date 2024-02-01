@@ -103,6 +103,8 @@ link* loadSignatures(link *virus_list , char* inputFile) {
     sscanf(inBuf,"%ms",&fileName);
     FILE* sigFile = fopen(fileName,"rb");
     if (sigFile == NULL) {
+        // freeing the ms allocation
+        free(fileName);
         perror("no file");
         return NULL;
     }
@@ -280,7 +282,5 @@ int main(int argc, char* argv[]) {
         }
 return 0;
 }
-        }
-return 0;
-}
+
 
