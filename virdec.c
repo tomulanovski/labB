@@ -17,6 +17,7 @@ virus *vir;
 
 int isLittle = 1;
 
+
 virus* readVirus(FILE* sigFile){
 
     virus* inputVirus = (virus*)(malloc(sizeof(virus)));
@@ -103,7 +104,7 @@ link* loadSignatures(link *virus_list , char* inputFile) {
     FILE* sigFile = fopen(fileName,"rb");
     if (sigFile == NULL) {
         perror("no file");
-        exit(0);
+        return NULL;
     }
     char magicNumber[4];
     fread(magicNumber, sizeof(char), 4, sigFile);
@@ -164,11 +165,59 @@ link* detectViruses(link *virus_list , char* inputFile){
     fclose(suspectedFile);
     return virus_list;
 }
+void neutralize_virus(char *fileName, int signatureOffset){
+    FILE *infectedFile = fopen(fileName, "r+b");
+
+    if (infectedFile == NULL) {
+        perror("Error opening infected file");
+        return;
+    }
+
+    // Move the file pointer to the location of the virus in the file
+    fseek(infectedFile, signatureOffset, SEEK_SET);
+
+    // Neutralize the virus by writing a RET instruction (e.g., 0xC3) at the offset
+    char RET[] = "0xC3";
+    fwrite(RET, sizeof(RET), 1, infectedFile);
+    fclose(infectedFile);
+
+}
 
 
 
 link* fixFile(link *virus_list , char* inputFile){
-    printf("not implemented yet\n");
+    char buf[10000 * sizeof(char)];
+    FILE *suspectedFile = fopen(inputFile, "rb");
+
+    if (suspectedFile == NULL) {
+        perror("Error opening suspected file");
+        return virus_list;
+    }
+
+    unsigned int size = fread(buf, 1, sizeof(buf), suspectedFile);
+    fclose(suspectedFile);
+
+    link *curVirus = virus_list;
+
+    while (curVirus != NULL) {
+        virus *vir = curVirus->vir;
+        int virusSize = vir->SigSize;
+
+        for (int position = 0; position < size - virusSize; position++) {
+            if (memcmp(buf + position, vir->sig, virusSize) == 0) {
+                // Virus detected
+                printf("Virus %s detected!\n",vir->virusName);
+                printf("neutralizing the virus\n");
+                // Neutralize the virus in the infected file
+                neutralize_virus(inputFile, position);
+                printf("virus %s neutralized \n", vir->virusName);
+                break;
+            }
+        }
+
+        curVirus = curVirus->nextVirus;
+    }
+
     return virus_list;
 }
 link* quit(link *virus_list , char* inputFile) {
@@ -228,6 +277,9 @@ int main(int argc, char* argv[]) {
             printf ("Not within bounds\nExiting\n");
             exit(1);
         }
+        }
+return 0;
+}
         }
 return 0;
 }
